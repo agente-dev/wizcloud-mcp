@@ -1,12 +1,29 @@
 {
   "name": "wizcloud-mcp",
   "version": "0.1.0",
-  "description": "Unofficial MCP server for the Hashavshevet (WizCloud) REST API",
+  "description": "Hashavshevet MCP (wizcloud-mcp): an unofficial MCP server for the WizCloud REST API",
   "type": "module",
   "license": "MIT",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/agente-dev/wizcloud-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/agente-dev/wizcloud-mcp/issues"
+  },
+  "homepage": "https://github.com/agente-dev/wizcloud-mcp#readme",
+  "keywords": [
+    "hashavshevet",
+    "wizcloud",
+    "mcp",
+    "model-context-protocol",
+    "accounting",
+    "bookkeeping"
+  ],
   "bin": {
-    "wizcloud-mcp": "dist/index.js"
+    "wizcloud-mcp": "dist/index.js",
+    "hashavshevet-mcp": "dist/index.js"
   },
   "files": [
     "dist"

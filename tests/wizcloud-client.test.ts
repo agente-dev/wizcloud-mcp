@@ -143,6 +143,25 @@ describe("redaction", () => {
       "a [REDACTED] b [REDACTED]",
     );
   });
+
+  it("redacts an encoded API key from a network error", async () => {
+    const apiToken = "test/token?key=1";
+    const encodedToken = encodeURIComponent(apiToken);
+    const fetchImpl = (async () => {
+      throw new Error(`request failed for /createSession/${encodedToken}/TESTDB`);
+    }) as unknown as typeof fetch;
+    const client = new WizcloudClient({
+      server: "lb1.wizcloud.co.il",
+      apiToken,
+      primaryDb: "TESTDB",
+      fetchImpl,
+    });
+
+    const err = await client.getDoc("TESTDB", { stockID: 1 }).catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(WizcloudApiError);
+    expect((err as Error).message).not.toContain(encodedToken);
+    expect((err as Error).message).toContain("[REDACTED]");
+  });
 });
 
 describe("endpoint wrappers", () => {

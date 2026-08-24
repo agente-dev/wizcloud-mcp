@@ -110,7 +110,10 @@ export class WizcloudClient {
       res = await this.fetchImpl(url, { method: "GET" });
     } catch (err) {
       throw new WizcloudApiError(
-        `createSession failed for DB "${dbName}": network error (${err instanceof Error ? err.message : String(err)})`,
+        `createSession failed for DB "${dbName}": network error (${redactSecrets(String(err), [
+          this.apiToken,
+          encodeURIComponent(this.apiToken),
+        ])})`,
         { status: null, apiPath: "createSession" },
       );
     }
@@ -216,7 +219,11 @@ export class WizcloudClient {
 
   /** Body excerpt safe for error messages: truncated and token-redacted. */
   private safeBodySnippet(text: string, sessionToken?: string): string {
-    const secrets = [this.apiToken, ...(sessionToken ? [sessionToken] : [])];
+    const secrets = [
+      this.apiToken,
+      encodeURIComponent(this.apiToken),
+      ...(sessionToken ? [sessionToken, encodeURIComponent(sessionToken)] : []),
+    ];
     const cleaned = redactSecrets(text, secrets).trim();
     if (!cleaned) return "";
     return `: ${cleaned.slice(0, 300)}`;

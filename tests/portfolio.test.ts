@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -40,6 +40,15 @@ describe("PortfolioStore", () => {
     const mode = (await stat(store.filePath)).mode & 0o777;
     expect(mode).toBe(0o600);
     expect(await store.load()).toEqual(PORTFOLIO);
+  });
+
+  it("tightens permissions again when refreshing an existing file", async () => {
+    await store.save(PORTFOLIO);
+    await chmod(store.filePath, 0o644);
+
+    await store.save({ ...PORTFOLIO, updatedAt: "2026-07-26T00:00:00.000Z" });
+
+    expect((await stat(store.filePath)).mode & 0o777).toBe(0o600);
   });
 
   it("refresh calls TokenCompanies, normalizes, and rewrites the store", async () => {

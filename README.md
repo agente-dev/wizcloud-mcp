@@ -1,10 +1,34 @@
-# wizcloud-mcp
+# Hashavshevet MCP
 
-Unofficial MCP (Model Context Protocol) stdio server for the **WizCloud** REST API — the cloud API of **חשבשבת בענן (Hashavshevet)**.
+Unofficial MCP (Model Context Protocol) stdio server for **חשבשבת בענן (Hashavshevet)** through the **WizCloud** REST API.
+
+The public-facing name is **Hashavshevet MCP**. `wizcloud-mcp` remains the
+package, CLI, and MCP server identifier for compatibility with the existing
+Agente Desktop bundle and downstream configurations. The additive
+`hashavshevet-mcp` CLI alias is also available when the package is published.
 
 > **Disclaimer:** This is an **unofficial community client**. It is not affiliated with, endorsed by, or supported by חשבשבת / Hashavshevet / WizCloud. All product names and trademarks belong to their respective owners. Use at your own risk against your own WizCloud account and API credentials.
 
-API reference: [docs.wizcloud.co.il REST API](http://docs.wizcloud.co.il/docs/rest-api/) and the official [Swagger definition](https://app.swaggerhub.com/apis-docs/Wizcloud/Api/1.0.0).
+> **Publication note:** The source repository can be public while the npm
+> package remains intentionally marked `private` until registry publication
+> is explicitly approved. Do not commit credentials, portfolio files, or live
+> customer data.
+
+API reference: [docs.wizcloud.co.il REST API](https://docs.wizcloud.co.il/docs/rest-api/) and the official [Swagger definition](https://app.swaggerhub.com/apis-docs/Wizcloud/Api/1.0.0).
+
+## Quick start
+
+Requires Node.js ≥ 22 (24 recommended, see `.nvmrc`) and pnpm.
+
+```bash
+pnpm install
+pnpm build
+```
+
+Use `.env.example` as a template for a private environment or configure the
+variables in your MCP client. The server does not load `.env` files itself.
+It is stdio-based, so stdout is reserved for MCP messages and diagnostics go
+to stderr.
 
 ## What it does
 
@@ -46,10 +70,14 @@ Optional:
 
 ### Example MCP client config (Claude Desktop / Claude Code)
 
+The `mcpServers` key is a local label. Existing configurations using
+`"wizcloud"` continue to work; new configurations can use the recognizable
+`"hashavshevet"` label shown here.
+
 ```json
 {
   "mcpServers": {
-    "wizcloud": {
+    "hashavshevet": {
       "command": "node",
       "args": ["/path/to/wizcloud-mcp/dist/index.js"],
       "env": {
@@ -64,14 +92,33 @@ Optional:
 
 ## Development
 
-Requires Node.js ≥ 22 (24 recommended, see `.nvmrc`) and pnpm.
-
 ```bash
 pnpm install        # install dependencies
 pnpm test           # run the vitest suite (all HTTP mocked)
 pnpm typecheck      # tsc --noEmit
 pnpm build          # tsup → single-file dist/index.js
+pnpm audit --prod --audit-level high
 ```
+
+All tests use mocked HTTP responses. No test requires a live WizCloud account
+or credentials.
+
+## Compatibility and release gates
+
+- Keep the package name `wizcloud-mcp`, the `wizcloud-mcp` bin, the
+  `hashavshevet_*` tool names, and the `HASHAVSHVET_*` environment variables
+  stable. Renaming any of these requires an explicit migration plan.
+- The `hashavshevet-mcp` bin is an additive alias; it does not replace the
+  existing command.
+- Repository visibility, npm publication, release tags, MCP registry listing,
+  and downstream Desktop bundle updates are separate cutover steps. This
+  source PR does not perform any of them.
+- Before publication, run the full CI suite, review the dependency audit,
+  verify the current Desktop bundle against the merged commit, and complete
+  live multi-company dogfood without exposing customer data.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and
+[RELEASING.md](RELEASING.md) for the public-repository workflow.
 
 ## Architecture
 
@@ -82,7 +129,7 @@ pnpm build          # tsup → single-file dist/index.js
 
 ---
 
-# wizcloud-mcp (עברית)
+# Hashavshevet MCP (עברית)
 
 שרת MCP לא-רשמי (stdio) עבור ה-REST API של **חשבשבת בענן (WizCloud)**.
 
@@ -132,6 +179,6 @@ pnpm typecheck   # tsc --noEmit
 pnpm build       # tsup → dist/index.js כקובץ יחיד
 ```
 
-## License
+## רישיון
 
-MIT
+MIT — ראו [LICENSE](LICENSE).

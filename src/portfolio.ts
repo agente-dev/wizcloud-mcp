@@ -15,7 +15,7 @@
  * If dogfooding shows the real shape differs, fix normalizeCompanies() only.
  */
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { WizcloudClient } from "./wizcloud-client.js";
 
@@ -72,6 +72,9 @@ export class PortfolioStore {
       encoding: "utf8",
       mode: 0o600,
     });
+    // `mode` only applies when the file is created. Re-assert it on refresh so
+    // a pre-existing portfolio cannot remain readable by other local users.
+    await chmod(this.filePath, 0o600);
   }
 
   /** Re-call TokenCompanies and rewrite the store. Returns the new portfolio. */
