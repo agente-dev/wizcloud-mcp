@@ -6,7 +6,7 @@
  * ./hashavshevet-portfolio.json) with file mode 0600. File contents are never
  * logged.
  *
- * ASSUMPTION (not documented in the Swagger): the TokenCompanies response
+ * ASSUMPTION (not documented in the official REST API documentation): the TokenCompanies response
  * shape. normalizeCompanies() tolerates:
  *   - a bare array, or `{ companies: [...] }` / `{ Companies: [...] }` /
  *     `{ data: [...] }` / `{ rows: [...] }`;
@@ -15,7 +15,7 @@
  * If dogfooding shows the real shape differs, fix normalizeCompanies() only.
  */
 
-import { chmod, mkdir, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import type { WizcloudClient } from "./wizcloud-client.js";
 
@@ -53,9 +53,13 @@ export class PortfolioStore {
     let raw: string;
     try {
       raw = await readFile(this.filePath, "utf8");
-    } catch {
-      return null;
+    } catch (err) {
+      if (isMissingFileError(err)) return null;
+      throw new PortfolioError(`Unable to read the portfolio file safely: ${errorMessage(err)}`);
     }
+    // A file may have been created or modified outside this process. Reassert
+    // the private mode before accepting any persisted company data.
+    await ensurePrivateFileMode(this.filePath);
     try {
       const parsed = JSON.parse(raw) as Portfolio;
       if (!parsed || !Array.isArray(parsed.companies)) return null;
@@ -75,6 +79,7 @@ export class PortfolioStore {
     // `mode` only applies when the file is created. Re-assert it on refresh so
     // a pre-existing portfolio cannot remain readable by other local users.
     await chmod(this.filePath, 0o600);
+    await ensurePrivateFileMode(this.filePath);
   }
 
   /** Re-call TokenCompanies and rewrite the store. Returns the new portfolio. */
@@ -151,6 +156,46 @@ function pickString(record: Record<string, unknown>, keys: string[]): string | n
     if (typeof value === "string" && value.length > 0) return value;
   }
   return null;
+}
+
+/**
+ * Ensure a persisted portfolio is owner-only readable/writable. chmod is
+ * available on supported Node platforms; verifying the resulting mode keeps
+ * the loader fail-closed if the host cannot enforce the requested permission.
+ */
+async function ensurePrivateFileMode(filePath: string): Promise<void> {
+  let current;
+  try {
+    current = await stat(filePath);
+  } catch (err) {
+    throw new PortfolioError(`Unable to inspect the portfolio file safely: ${errorMessage(err)}`);
+  }
+
+  if ((current.mode & 0o077) === 0) return;
+
+  try {
+    await chmod(filePath, 0o600);
+  } catch (err) {
+    throw new PortfolioError(`Portfolio file permissions could not be tightened: ${errorMessage(err)}`);
+  }
+
+  let tightened;
+  try {
+    tightened = await stat(filePath);
+  } catch (err) {
+    throw new PortfolioError(`Unable to verify portfolio file permissions: ${errorMessage(err)}`);
+  }
+  if ((tightened.mode & 0o077) !== 0) {
+    throw new PortfolioError("Portfolio file permissions remain too broad; refusing to load it");
+  }
+}
+
+function isMissingFileError(err: unknown): boolean {
+  return Boolean(err && typeof err === "object" && "code" in err && err.code === "ENOENT");
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 /** Build the standard "unknown company" error, listing known names. */

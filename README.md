@@ -14,7 +14,14 @@ Agente Desktop bundle and downstream configurations. The additive
 > is explicitly approved. Do not commit credentials, portfolio files, or live
 > customer data.
 
-API reference: [docs.wizcloud.co.il REST API](https://docs.wizcloud.co.il/docs/rest-api/) and the official [Swagger definition](https://app.swaggerhub.com/apis-docs/Wizcloud/Api/1.0.0).
+API reference: the official [WizCloud REST API documentation](https://docs.wizcloud.co.il/docs/rest-api/) — Latest (2.0.0).
+
+Supported API surface: the seven tools below cover the documented REST API
+endpoint groups for sessions and company lists, journal batches, documents and
+receipts, report exports, bank pages, master data, and webhook triggers. Request
+payloads are passed through as documented on the linked WizCloud endpoint pages;
+responses are passed through without response-schema validation. Endpoints not
+listed here — including `invApi/delDocument` — are not exposed by this server.
 
 ## Quick start
 
@@ -48,7 +55,7 @@ Notes:
 
 - `invApi/delDocument` is **deliberately not exposed**.
 - Every data tool takes a required `company` argument — an exact company name or DBName from the portfolio (run `hashavshevet_companies` `list` to see them). Unknown companies are rejected with a list of known names; the server never guesses.
-- Each tool takes an optional `data` object that is forwarded verbatim to the endpoint. Request schemas confirmed via the official Swagger are documented in `src/wizcloud-client.ts`; where the shape is undocumented (`TokenCompanies`, `createSession` response), the assumption is documented in code comments.
+- Each tool takes an optional `data` object that is forwarded verbatim to the endpoint. Request schemas confirmed in the official WizCloud REST API documentation are documented in `src/wizcloud-client.ts`; where the shape is undocumented (`TokenCompanies`, `createSession` response), the assumption is documented in code comments.
 - Session handling: the server mints a `wizAuthToken` per company DB via `createSession`, caches it for 23 hours (the API's TTL is 24h), and re-mints once automatically on auth errors. The token and API key are never logged and never appear in error messages.
 - The company portfolio is persisted to a local JSON file with mode `0600`; its contents are never logged.
 
@@ -97,11 +104,15 @@ pnpm install        # install dependencies
 pnpm test           # run the vitest suite (all HTTP mocked)
 pnpm typecheck      # tsc --noEmit
 pnpm build          # tsup → single-file dist/index.js
+pnpm check-third-party-notices
+pnpm verify-package-artifact
 pnpm audit --prod --audit-level high
 ```
 
 All tests use mocked HTTP responses. No test requires a live WizCloud account
-or credentials.
+or credentials. The production dependency notices are generated into
+`THIRD_PARTY_NOTICES.md` and the package dry-run verifies that the file ships
+with `dist/index.js`.
 
 ## Compatibility and release gates
 

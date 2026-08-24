@@ -24,6 +24,9 @@ jobs:
       - name: Audit production dependencies
         run: pnpm audit --prod --audit-level high
 
+      - name: Verify third-party notices are current
+        run: pnpm check-third-party-notices
+
       - name: Typecheck
         run: pnpm exec tsc --noEmit
 
@@ -32,3 +35,6 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      - name: Verify package dry-run includes notices
+        run: pnpm verify-package-artifact

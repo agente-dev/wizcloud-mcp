@@ -100,12 +100,14 @@ describe("tools/list", () => {
     ]);
   });
 
-  it("marks read-only tools and never sets destructiveHint", async () => {
+  it("marks read-only tools and marks the trigger delete action destructive", async () => {
     const { tools } = await mcpClient.listTools();
     const byName = new Map(tools.map((t) => [t.name, t]));
     expect(byName.get("hashavshevet_companies")?.annotations?.readOnlyHint).toBe(true);
     expect(byName.get("hashavshevet_export")?.annotations?.readOnlyHint).toBe(true);
+    expect(byName.get("hashavshevet_triggers")?.annotations?.destructiveHint).toBe(true);
     for (const tool of tools) {
+      if (tool.name === "hashavshevet_triggers") continue;
       expect(tool.annotations?.destructiveHint ?? false).toBe(false);
     }
   });

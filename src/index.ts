@@ -16,6 +16,7 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { WizcloudClient } from "./wizcloud-client.js";
 import { PortfolioStore, type Company } from "./portfolio.js";
 import { registerTools } from "./tools.js";
+import { formatListeningMessage } from "./startup.js";
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -56,7 +57,7 @@ async function main(): Promise<void> {
 
   const transport = new StdioServerTransport();
   await mcp.connect(transport);
-  console.error(`wizcloud-mcp: listening on stdio (server=${server}, primaryDb=${primaryDb})`);
+  console.error(formatListeningMessage(server));
 }
 
 main().catch((err) => {

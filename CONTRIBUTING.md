@@ -22,6 +22,8 @@ pnpm install --frozen-lockfile --ignore-scripts
 pnpm test
 pnpm typecheck
 pnpm build
+pnpm check-third-party-notices
+pnpm verify-package-artifact
 pnpm audit --prod --audit-level high
 ```
 

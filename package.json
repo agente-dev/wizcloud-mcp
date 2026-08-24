@@ -26,7 +26,8 @@
     "hashavshevet-mcp": "dist/index.js"
   },
   "files": [
-    "dist"
+    "dist",
+    "THIRD_PARTY_NOTICES.md"
   ],
   "engines": {
     "node": ">=22"
@@ -35,7 +36,11 @@
     "build": "tsup",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "dev": "tsup --watch"
+    "dev": "tsup --watch",
+    "generate-third-party-notices": "node scripts/generate-third-party-notices.mjs",
+    "check-third-party-notices": "node scripts/generate-third-party-notices.mjs --check",
+    "verify-package-artifact": "node scripts/verify-package-artifact.mjs",
+    "prepack": "pnpm build && pnpm generate-third-party-notices"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.17.0",

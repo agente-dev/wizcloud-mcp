@@ -20,6 +20,10 @@ performed by an ordinary code PR:
 7. After the cutover, verify the public clone, CI, package metadata, links,
    security settings, and downstream Desktop runtime. Record the exact commit
    and any follow-up issues.
+8. Confirm the authoritative legal copyright owner for `LICENSE` before
+   publication. This source PR intentionally leaves the current
+   `Copyright (c) 2026 Agente` notice unchanged and makes no rights-holder
+   determination without authoritative evidence.
 
 The package and CLI identifiers remain `wizcloud-mcp` for compatibility. The
 human-facing product name is Hashavshevet MCP; the `hashavshevet-mcp` CLI alias
