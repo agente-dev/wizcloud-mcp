@@ -11,9 +11,9 @@
  * that mix reads and writes (hashavshevet_documents, hashavshevet_triggers,
  * hashavshevet_journal_batch, hashavshevet_bank_pages, hashavshevet_master_data)
  * get the safe default readOnlyHint: false, even though some of their actions
- * (get_doc, triggers get) are reads. destructiveHint is false everywhere — no
- * delete-style endpoints are exposed (invApi/delDocument is deliberately
- * excluded).
+ * (get_doc, triggers get) are reads. `hashavshevet_triggers` also exposes the
+ * documented deleteURL action, so its tool-level destructiveHint is true. The
+ * separate invApi/delDocument endpoint remains deliberately excluded.
  */
 
 import { z } from "zod";
@@ -103,7 +103,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       description:
         "Create, fetch, and issue WizCloud documents (חשבוניות/תעודות). " +
-        "create_doc → invApi/createDoc (payload per Swagger: { issueStock, deleteTemp, rows }). " +
+        "create_doc → invApi/createDoc (payload per official docs: { issueStock, deleteTemp, rows }). " +
         "get_doc → invApi/getDoc ({ stockID }). issue_document → invApi/issueDocument ({ stockID }). " +
         "create_receipt → docsApi/createRecipt. create_invoice_receipt → docsApi/createInvRecipt.",
       inputSchema: {
@@ -141,7 +141,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       description:
         "Staged journal-entry batch pipeline (פקודות יומן). " +
-        "create_temp → jtransApi/tmpBatch (stage rows; payload per Swagger: { insertolastb, batchNo, check, issue, rows[] }). " +
+        "create_temp → jtransApi/tmpBatch (stage rows; payload per official docs: { insertolastb, batchNo, check, issue, rows[] }). " +
         "check → jtransApi/chkBatch ({ batchNo }). finalize → jtransApi/newBatch. issue → jtransApi/issueBatch ({ batchNo }).",
       inputSchema: {
         action: z.enum(["create_temp", "check", "finalize", "issue"]),
@@ -176,7 +176,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       description:
         "Run a WizCloud report export (הפקת דוחות) via ExportDataApi/exportData. " +
-        "data = { datafile: string, parameters: string } (schema confirmed via Swagger; valid datafile report identifiers are account-specific).",
+        "data = { datafile: string, parameters: string } (schema confirmed via official docs; valid datafile report identifiers are account-specific).",
       inputSchema: {
         action: z.enum(["export"]),
         company: companyArg,
@@ -202,7 +202,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       description:
         "Import bank statement rows (דפי בנק) via BankPagesApi/importBankPage. " +
-        "data = { rows: [{ AccountKey, Reference?, CreditDebit (1|0), SuF, Details?, DatF? }] } (schema confirmed via Swagger).",
+        "data = { rows: [{ AccountKey, Reference?, CreditDebit (1|0), SuF, Details?, DatF? }] } (schema confirmed via official docs).",
       inputSchema: {
         action: z.enum(["import"]),
         company: companyArg,
@@ -229,7 +229,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       description:
         "Import master data: import_index → IndexApi/importIndex (accounts/items: { myindex: acc|itm, insertnew, rows[] }); " +
         "import_sort_codes → SortCodeApi/importSortCodes ({ myindex: accsort|itmsort, rows[] }); " +
-        "import_trans_types → TransTypesApi/importTransTypes ({ rows[] }). Schemas confirmed via Swagger.",
+        "import_trans_types → TransTypesApi/importTransTypes ({ rows[] }). Schemas confirmed via official docs.",
       inputSchema: {
         action: z.enum(["import_index", "import_sort_codes", "import_trans_types"]),
         company: companyArg,
@@ -268,7 +268,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         company: companyArg,
         data: dataArg,
       },
-      annotations: { readOnlyHint: false, destructiveHint: false },
+      annotations: { readOnlyHint: false, destructiveHint: true },
     },
     async ({ action, company, data }) => {
       try {

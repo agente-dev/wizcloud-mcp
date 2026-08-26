@@ -1,10 +1,41 @@
-# wizcloud-mcp
+# Hashavshevet MCP
 
-Unofficial MCP (Model Context Protocol) stdio server for the **WizCloud** REST API — the cloud API of **חשבשבת בענן (Hashavshevet)**.
+Unofficial MCP (Model Context Protocol) stdio server for **חשבשבת בענן (Hashavshevet)** through the **WizCloud** REST API.
+
+The public-facing name is **Hashavshevet MCP**. `wizcloud-mcp` remains the
+package, CLI, and MCP server identifier for compatibility with the existing
+Agente Desktop bundle and downstream configurations. The additive
+`hashavshevet-mcp` CLI alias is also available when the package is published.
 
 > **Disclaimer:** This is an **unofficial community client**. It is not affiliated with, endorsed by, or supported by חשבשבת / Hashavshevet / WizCloud. All product names and trademarks belong to their respective owners. Use at your own risk against your own WizCloud account and API credentials.
 
-API reference: [docs.wizcloud.co.il REST API](http://docs.wizcloud.co.il/docs/rest-api/) and the official [Swagger definition](https://app.swaggerhub.com/apis-docs/Wizcloud/Api/1.0.0).
+> **Publication note:** The source repository can be public while the npm
+> package remains intentionally marked `private` until registry publication
+> is explicitly approved. Do not commit credentials, portfolio files, or live
+> customer data.
+
+API reference: the official [WizCloud REST API documentation](https://docs.wizcloud.co.il/docs/rest-api/) — Latest (2.0.0).
+
+Supported API surface: the seven tools below cover the documented REST API
+endpoint groups for sessions and company lists, journal batches, documents and
+receipts, report exports, bank pages, master data, and webhook triggers. Request
+payloads are passed through as documented on the linked WizCloud endpoint pages;
+responses are passed through without response-schema validation. Endpoints not
+listed here — including `invApi/delDocument` — are not exposed by this server.
+
+## Quick start
+
+Requires Node.js ≥ 22 (24 recommended, see `.nvmrc`) and pnpm.
+
+```bash
+pnpm install
+pnpm build
+```
+
+Use `.env.example` as a template for a private environment or configure the
+variables in your MCP client. The server does not load `.env` files itself.
+It is stdio-based, so stdout is reserved for MCP messages and diagnostics go
+to stderr.
 
 ## What it does
 
@@ -24,7 +55,7 @@ Notes:
 
 - `invApi/delDocument` is **deliberately not exposed**.
 - Every data tool takes a required `company` argument — an exact company name or DBName from the portfolio (run `hashavshevet_companies` `list` to see them). Unknown companies are rejected with a list of known names; the server never guesses.
-- Each tool takes an optional `data` object that is forwarded verbatim to the endpoint. Request schemas confirmed via the official Swagger are documented in `src/wizcloud-client.ts`; where the shape is undocumented (`TokenCompanies`, `createSession` response), the assumption is documented in code comments.
+- Each tool takes an optional `data` object that is forwarded verbatim to the endpoint. Request schemas confirmed in the official WizCloud REST API documentation are documented in `src/wizcloud-client.ts`; where the shape is undocumented (`TokenCompanies`, `createSession` response), the assumption is documented in code comments.
 - Session handling: the server mints a `wizAuthToken` per company DB via `createSession`, caches it for 23 hours (the API's TTL is 24h), and re-mints once automatically on auth errors. The token and API key are never logged and never appear in error messages.
 - The company portfolio is persisted to a local JSON file with mode `0600`; its contents are never logged.
 
@@ -46,10 +77,14 @@ Optional:
 
 ### Example MCP client config (Claude Desktop / Claude Code)
 
+The `mcpServers` key is a local label. Existing configurations using
+`"wizcloud"` continue to work; new configurations can use the recognizable
+`"hashavshevet"` label shown here.
+
 ```json
 {
   "mcpServers": {
-    "wizcloud": {
+    "hashavshevet": {
       "command": "node",
       "args": ["/path/to/wizcloud-mcp/dist/index.js"],
       "env": {
@@ -64,14 +99,37 @@ Optional:
 
 ## Development
 
-Requires Node.js ≥ 22 (24 recommended, see `.nvmrc`) and pnpm.
-
 ```bash
 pnpm install        # install dependencies
 pnpm test           # run the vitest suite (all HTTP mocked)
 pnpm typecheck      # tsc --noEmit
 pnpm build          # tsup → single-file dist/index.js
+pnpm check-third-party-notices
+pnpm verify-package-artifact
+pnpm audit --prod --audit-level high
 ```
+
+All tests use mocked HTTP responses. No test requires a live WizCloud account
+or credentials. The production dependency notices are generated into
+`THIRD_PARTY_NOTICES.md` and the package dry-run verifies that the file ships
+with `dist/index.js`.
+
+## Compatibility and release gates
+
+- Keep the package name `wizcloud-mcp`, the `wizcloud-mcp` bin, the
+  `hashavshevet_*` tool names, and the `HASHAVSHVET_*` environment variables
+  stable. Renaming any of these requires an explicit migration plan.
+- The `hashavshevet-mcp` bin is an additive alias; it does not replace the
+  existing command.
+- Repository visibility, npm publication, release tags, MCP registry listing,
+  and downstream Desktop bundle updates are separate cutover steps. This
+  source PR does not perform any of them.
+- Before publication, run the full CI suite, review the dependency audit,
+  verify the current Desktop bundle against the merged commit, and complete
+  live multi-company dogfood without exposing customer data.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md), and
+[RELEASING.md](RELEASING.md) for the public-repository workflow.
 
 ## Architecture
 
@@ -82,7 +140,7 @@ pnpm build          # tsup → single-file dist/index.js
 
 ---
 
-# wizcloud-mcp (עברית)
+# Hashavshevet MCP (עברית)
 
 שרת MCP לא-רשמי (stdio) עבור ה-REST API של **חשבשבת בענן (WizCloud)**.
 
@@ -132,6 +190,6 @@ pnpm typecheck   # tsc --noEmit
 pnpm build       # tsup → dist/index.js כקובץ יחיד
 ```
 
-## License
+## רישיון
 
-MIT
+MIT — ראו [LICENSE](LICENSE).

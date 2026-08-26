@@ -5,12 +5,14 @@
  * file. If dogfooding reveals a wrong path or payload shape, this is the only
  * file that should need to change.
  *
- * Schema sources (fetched 2026-07-25):
- * - Confirmed via the official Swagger: https://app.swaggerhub.com/apis-docs/Wizcloud/Api/1.0.0
- *   (registry: https://api.swaggerhub.com/apis/Wizcloud/Api/1.0.0)
- *   Confirmed request bodies: invApi/*, docsApi/*, jtransApi/*, IndexApi,
- *   SortCodeApi, TransTypesApi, BankPagesApi, ExportDataApi, TriggersApi.
- * - ASSUMPTIONS (not documented in the Swagger):
+ * Schema sources (checked 2026-08-25):
+ * - Official WizCloud REST API documentation, Latest (2.0.0):
+ *   https://docs.wizcloud.co.il/docs/rest-api/
+ *   The linked endpoint pages document request bodies for invApi/*, docsApi/*,
+ *   jtransApi/*, IndexApi, SortCodeApi, TransTypesApi, BankPagesApi,
+ *   ExportDataApi, and TriggersApi. This client implements only those endpoint
+ *   wrappers listed below; other documented endpoints are not exposed.
+ * - ASSUMPTIONS (not documented in the official REST API documentation):
  *   1. createSession response: assumed JSON containing a `wizAuthToken` string
  *      field (docs say "Return wizAuthToken"). Parser also tolerates a bare
  *      string body or other single-string-field objects.
@@ -110,7 +112,10 @@ export class WizcloudClient {
       res = await this.fetchImpl(url, { method: "GET" });
     } catch (err) {
       throw new WizcloudApiError(
-        `createSession failed for DB "${dbName}": network error (${err instanceof Error ? err.message : String(err)})`,
+        `createSession failed for DB "${dbName}": network error (${redactSecrets(String(err), [
+          this.apiToken,
+          encodeURIComponent(this.apiToken),
+        ])})`,
         { status: null, apiPath: "createSession" },
       );
     }
@@ -216,7 +221,11 @@ export class WizcloudClient {
 
   /** Body excerpt safe for error messages: truncated and token-redacted. */
   private safeBodySnippet(text: string, sessionToken?: string): string {
-    const secrets = [this.apiToken, ...(sessionToken ? [sessionToken] : [])];
+    const secrets = [
+      this.apiToken,
+      encodeURIComponent(this.apiToken),
+      ...(sessionToken ? [sessionToken, encodeURIComponent(sessionToken)] : []),
+    ];
     const cleaned = redactSecrets(text, secrets).trim();
     if (!cleaned) return "";
     return `: ${cleaned.slice(0, 300)}`;
@@ -232,7 +241,7 @@ export class WizcloudClient {
 
   // ---------------------------------------------------------------------------
   // Endpoint wrappers — one per documented apiPath. Payload schemas below are
-  // CONFIRMED from the Swagger unless marked ASSUMPTION.
+  // CONFIRMED from the official REST API documentation unless marked ASSUMPTION.
   // ---------------------------------------------------------------------------
 
   /**
@@ -295,7 +304,7 @@ export class WizcloudClient {
 
   /**
    * POST ExportDataApi/exportData — run a report export.
-   * Body: { datafile: string, parameters: string }. CONFIRMED (Swagger);
+   * Body: { datafile: string, parameters: string }. CONFIRMED (official docs);
    * the valid `datafile` report identifiers are not enumerated — passthrough.
    */
   async exportData(dbName: string, data: unknown): Promise<unknown> {
