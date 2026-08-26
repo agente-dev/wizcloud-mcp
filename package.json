@@ -43,7 +43,7 @@
     "prepack": "pnpm build && pnpm generate-third-party-notices"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.17.0",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
