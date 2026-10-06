@@ -3,7 +3,7 @@
 > This file is generated from the production dependency graph by `pnpm generate-third-party-notices`.
 > It covers the dependencies bundled into the Hashavshevet MCP distribution. Do not edit it by hand.
 
-## @hono/node-server@1.19.15
+## @hono/node-server@2.1.3
 
 - License: MIT
 - Source: https://github.com/honojs/node-server.git
@@ -32,7 +32,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## @modelcontextprotocol/sdk@1.29.0
+## @modelcontextprotocol/sdk@1.31.0
 
 - License: MIT
 - Source: https://github.com/modelcontextprotocol/typescript-sdk.git
@@ -301,7 +301,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## content-type@2.0.0
+## content-type@2.1.0
 
 - License: MIT
 - Source: jshttp/content-type
@@ -658,7 +658,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## eventsource-parser@3.1.0
+## eventsource-parser@3.1.1
 
 - License: MIT
 - Source: ssh://git@github.com/rexxars/eventsource-parser.git
@@ -717,13 +717,13 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## express-rate-limit@8.6.0
+## express-rate-limit@8.7.0
 
 - License: MIT
 - Source: https://github.com/express-rate-limit/express-rate-limit.git
 
 ```text
-# MIT License
+MIT License
 
 Copyright 2023 Nathan Friedly, Vedant K
 
@@ -738,11 +738,12 @@ The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
 ```
 
 ## express@5.2.1
@@ -1155,7 +1156,7 @@ ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR
 IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ```
 
-## jose@6.2.4
+## jose@6.2.12
 
 - License: MIT
 - Source: panva/jose
@@ -1418,7 +1419,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## negotiator@1.0.0
+## negotiator@1.1.0
 
 - License: MIT
 - Source: jshttp/negotiator
@@ -1698,7 +1699,7 @@ TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-## qs@6.15.3
+## qs@6.16.0
 
 - License: BSD-3-Clause
 - Source: https://github.com/ljharb/qs.git
