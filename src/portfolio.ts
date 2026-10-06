@@ -21,7 +21,7 @@
 
 import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
-import type { WizcloudClient } from "./wizcloud-client.js";
+import { WizcloudApiError, type WizcloudClient } from "./wizcloud-client.js";
 
 export interface Company {
   /** Display name, as returned by TokenCompanies. */
@@ -95,7 +95,36 @@ export class PortfolioStore {
    * existing cache.
    */
   async refresh(client: WizcloudClient): Promise<PortfolioRefreshResult> {
-    const raw = await client.tokenCompanies();
+    let raw: unknown;
+    try {
+      raw = await client.tokenCompanies();
+    } catch (err) {
+      // Acquisition (HTTP/network/bootstrap) failures surface here BEFORE the
+      // documented-envelope parser. The shared client's error text can embed
+      // provider response bodies — translate to FIXED messages at this seam
+      // only, keyed off the typed surface, so no provider text reaches any
+      // caller. Classification keywords are deliberate: "credential" routes
+      // Desktop health to auth_failed, "network" to unreachable, anything
+      // else stays server_invalid.
+      if (err instanceof WizcloudApiError) {
+        if (err.status === 401 || err.status === 403 || err.isAuthError) {
+          throw new PortfolioError(
+            "The company list request could not be authenticated with the provided credentials; the portfolio cache was left unchanged",
+          );
+        }
+        if (err.status === null) {
+          throw new PortfolioError(
+            "The company list request could not reach the server (network failure); the portfolio cache was left unchanged",
+          );
+        }
+        throw new PortfolioError(
+          "The company list request failed at the provider; the portfolio cache was left unchanged",
+        );
+      }
+      throw new PortfolioError(
+        "The company list request could not be completed; the portfolio cache was left unchanged",
+      );
+    }
     const documented = parseDocumentedTokenCompanies(raw, this.defaultServer);
     if (documented !== null) {
       if (documented.outcome === "ok") {
@@ -232,7 +261,11 @@ export function parseDocumentedTokenCompanies(
     // values are not this row's identity, and a display name is never used.
     if (!Object.hasOwn(row, "Company_File_Name")) return { outcome: "malformed" };
     const raw = row.Company_File_Name;
-    const file = typeof raw === "string" && raw.trim().length > 0 ? raw : null;
+    // Persist the TRIMMED identifier: resolve() trims every caller-supplied
+    // needle, so a padded raw value would make the company unresolvable and
+    // would request sessions for a padded DB name. Whitespace-only stays
+    // malformed.
+    const file = typeof raw === "string" && raw.trim().length > 0 ? raw.trim() : null;
     if (!file) return { outcome: "malformed" };
     const name =
       typeof row.Company_Name === "string" && row.Company_Name.trim().length > 0

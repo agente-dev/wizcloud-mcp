@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  PortfolioError,
   PortfolioStore,
   normalizeCompanies,
   parseDocumentedTokenCompanies,
@@ -281,6 +282,85 @@ describe("parseDocumentedTokenCompanies (documented envelope)", () => {
 });
 
 describe("PortfolioStore.refresh against the documented envelope", () => {
+
+  it("PRRT_Su: persists the TRIMMED native DB identifier so padded Company_File_Name resolves and requests the clean DB", async () => {
+    const client = documentedClient({
+      statusCode: 200,
+      status: { errors: "OK", repdata: [{ Company_File_Name: "  PADDED-DB  ", Company_Name: "Padded Co" }] },
+    });
+    const refreshed = await store.refresh(client);
+    // Padded raw must NOT be persisted; trimmed identifier is the identity.
+    expect(refreshed.companies).toEqual([
+      { name: "Padded Co", dbName: "PADDED-DB", server: "lb1.wizcloud.co.il" },
+    ]);
+    // resolve() trims the needle; the CLEAN identifier must now match.
+    const loaded = await store.load();
+    expect(store.resolve(loaded!, "PADDED-DB")?.dbName).toBe("PADDED-DB");
+    expect(store.resolve(loaded!, "  PADDED-DB  ")?.dbName).toBe("PADDED-DB");
+    expect(store.resolve(loaded!, "Padded Co")?.dbName).toBe("PADDED-DB");
+    // Fallback display name (no Company_Name) must also be the trimmed DB.
+    const fallback = documentedClient({
+      statusCode: 200,
+      status: { errors: "OK", repdata: [{ Company_File_Name: "\tSTRIP-DB\n" }] },
+    });
+    const r2 = await store.refresh(fallback);
+    expect(r2.companies).toEqual([
+      { name: "STRIP-DB", dbName: "STRIP-DB", server: "lb1.wizcloud.co.il" },
+    ]);
+  });
+
+  it("PRRT_Su: whitespace-only Company_File_Name stays malformed with cache unchanged", async () => {
+    await store.save(PORTFOLIO);
+    const before = await readFile(store.filePath, "utf8");
+    const client = documentedClient({
+      statusCode: 200,
+      status: { errors: "OK", repdata: [{ Company_File_Name: "   ", Company_Name: "WS" }] },
+    });
+    await expect(store.refresh(client)).rejects.toThrow(/malformed/);
+    expect(await readFile(store.filePath, "utf8")).toBe(before);
+  });
+
+  it("PRRT_S2: 401/403 acquisition errors translate to a FIXED auth message; provider body never leaks", async () => {
+    for (const status of [401, 403]) {
+      const client = httpErrorClient(status, "PRIVATE-TOKEN-LEAK-XYZ");
+      await expect(store.refresh(client)).rejects.toThrow(
+        /company list request could not be authenticated/,
+      );
+      await expect(store.refresh(client)).rejects.not.toThrow(/PRIVATE-TOKEN-LEAK-XYZ/);
+    }
+  });
+
+  it("PRRT_S2: 500 acquisition errors translate to a FIXED provider-failure message", async () => {
+    const client = httpErrorClient(500, "PRIVATE-STACK-TRACE-ABC");
+    const err = (await store.refresh(client).catch((e: unknown) => e)) as PortfolioError;
+    expect(err).toBeInstanceOf(PortfolioError);
+    expect(err.message).toMatch(/company list request failed at the provider/);
+    expect(err.message).not.toContain("PRIVATE-STACK-TRACE-ABC");
+  });
+
+  it("PRRT_S2: network/bootstrap failures translate to a FIXED connectivity message", async () => {
+    const client = networkErrorClient(new Error("getaddrinfo ENOTFOUND private-host.internal"));
+    const err = (await store.refresh(client).catch((e: unknown) => e)) as PortfolioError;
+    expect(err).toBeInstanceOf(PortfolioError);
+    expect(err.message).toMatch(/company list request could not reach the server/);
+    expect(err.message).not.toContain("private-host.internal");
+  });
+
+  it("PRRT_S2: acquisition failures never overwrite the existing cache", async () => {
+    await store.save(PORTFOLIO);
+    const before = await readFile(store.filePath, "utf8");
+    const modeBefore = (await stat(store.filePath)).mode & 0o777;
+    for (const client of [
+      httpErrorClient(500, "SECRET-1"),
+      httpErrorClient(401, "SECRET-2"),
+      networkErrorClient(new Error("ECONNREFUSED")),
+    ]) {
+      await expect(store.refresh(client)).rejects.toThrow(PortfolioError);
+    }
+    expect(await readFile(store.filePath, "utf8")).toBe(before);
+    expect((await stat(store.filePath)).mode & 0o777).toBe(modeBefore);
+  });
+
   function documentedFetch(body: unknown): typeof fetch {
     return (async (input: unknown): Promise<Response> => {
       const url = String(input);
@@ -291,6 +371,37 @@ describe("PortfolioStore.refresh against the documented envelope", () => {
       return new Response(JSON.stringify(body), { status: 200 });
     }) as unknown as typeof fetch;
   }
+  // Real fetch-injected client whose TokenCompanies responds with an HTTP error
+  // carrying a PRIVATE provider payload — the WizcloudClient.post() throw path.
+  function httpErrorClient(status: number, privateBody: string): WizcloudClient {
+    const fetchImpl = (async (input: unknown): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/createSession/")) {
+        return new Response(JSON.stringify({ wizAuthToken: "session-xxx" }), { status: 200 });
+      }
+      return new Response(privateBody, { status, headers: { "content-type": "text/plain" } });
+    }) as unknown as typeof fetch;
+    return new WizcloudClient({
+      server: "lb1.wizcloud.co.il",
+      apiToken: "test-token-xxx",
+      primaryDb: "TESTDB",
+      fetchImpl,
+    });
+  }
+
+  // Real client whose fetch REJECTS (network/bootstrap failure).
+  function networkErrorClient(cause: Error): WizcloudClient {
+    const fetchImpl = (async () => {
+      throw cause;
+    }) as unknown as typeof fetch;
+    return new WizcloudClient({
+      server: "lb1.wizcloud.co.il",
+      apiToken: "test-token-xxx",
+      primaryDb: "TESTDB",
+      fetchImpl,
+    });
+  }
+
   function documentedClient(body: unknown): WizcloudClient {
     return new WizcloudClient({
       server: "lb1.wizcloud.co.il",

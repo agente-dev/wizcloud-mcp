@@ -208,6 +208,98 @@ describe("hashavshevet_companies", () => {
     }
   });
 
+  it("PRRT_Su: refresh of a padded Company_File_Name requests the CLEAN DB in the real session call", async () => {
+    // Real WizcloudClient + real tool wiring; capture the createSession URL.
+    const sessionUrls: string[] = [];
+    const paddedFetch = (async (input: unknown): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/createSession/")) {
+        sessionUrls.push(url);
+        return new Response(JSON.stringify({ wizAuthToken: "padded-session-xxx" }), { status: 200 });
+      }
+      return new Response(
+        JSON.stringify({
+          statusCode: 200,
+          status: { errors: "OK", repdata: [{ Company_File_Name: "  PADDED-DB  ", Company_Name: "Padded Co" }] },
+        }),
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch;
+    const paddedClient = new WizcloudClient({
+      server: "lb1.wizcloud.co.il",
+      apiToken: "test-token-xxx",
+      primaryDb: "TESTDB",
+      fetchImpl: paddedFetch,
+    });
+    const pStore = new PortfolioStore(join(dir, "padded-portfolio.json"), "lb1.wizcloud.co.il");
+    const pServer = new McpServer({ name: "wizcloud-mcp-padded-test", version: "0.0.0" });
+    registerTools(pServer, { clientFor: () => paddedClient, defaultClient: paddedClient, portfolio: pStore });
+    const [pc, ps] = InMemoryTransport.createLinkedPair();
+    const pProbe = new Client({ name: "padded-probe", version: "0.0.0" });
+    await Promise.all([pProbe.connect(pc), pServer.connect(ps)]);
+    try {
+      const result = await pProbe.callTool({ name: "hashavshevet_companies", arguments: { action: "refresh" } });
+      const text = (result as { content: Array<{ type: string; text: string }> }).content.map((b) => b.text).join("\n");
+      expect(text).toContain("PADDED-DB");
+      expect(text).not.toContain("  PADDED-DB");
+      // The persisted identity is clean: resolving the company and calling a
+      // data tool mints the session with the CLEAN DB name.
+      const list = await pProbe.callTool({ name: "hashavshevet_companies", arguments: { action: "list" } });
+      const listText = (list as { content: Array<{ type: string; text: string }> }).content.map((b) => b.text).join("\n");
+      expect(listText).toContain("PADDED-DB");
+      expect(listText).not.toContain("  PADDED-DB");
+      const doc = await pProbe.callTool({
+        name: "hashavshevet_documents",
+        arguments: { action: "get_doc", company: "Padded Co", data: { stockID: 1 } },
+      }).catch((e: Error) => e);
+      // The session URL for the resolved company must carry the CLEAN DB.
+      const companySession = sessionUrls.find((u) => u.includes("PADDED-DB"));
+      expect(companySession).toBeDefined();
+      expect(companySession).not.toMatch(/%20PADDED-DB|%09|PADDED-DB%20|PADDED-DB%20/);
+      expect(companySession).toContain("PADDED-DB");
+      expect(doc).toBeDefined();
+    } finally {
+      await pProbe.close();
+      await pServer.close();
+    }
+  });
+
+  it("PRRT_S2: tool refresh over HTTP 500 with a private payload emits the FIXED message only", async () => {
+    const leak = "PRIVATE-PROVIDER-STACK-ABC";
+    const failingFetch = (async (input: unknown): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/createSession/")) {
+        return new Response(JSON.stringify({ wizAuthToken: "leak-session-xxx" }), { status: 200 });
+      }
+      return new Response(`provider failure: ${leak}`, { status: 500 });
+    }) as unknown as typeof fetch;
+    const leakClient = new WizcloudClient({
+      server: "lb1.wizcloud.co.il",
+      apiToken: "test-token-xxx",
+      primaryDb: "TESTDB",
+      fetchImpl: failingFetch,
+    });
+    const lStore = new PortfolioStore(join(dir, "leak-portfolio.json"), "lb1.wizcloud.co.il");
+    await lStore.save(PORTFOLIO);
+    const before = await readFile(lStore.filePath, "utf8");
+    const lServer = new McpServer({ name: "wizcloud-mcp-leak-test", version: "0.0.0" });
+    registerTools(lServer, { clientFor: () => leakClient, defaultClient: leakClient, portfolio: lStore });
+    const [lc, ls] = InMemoryTransport.createLinkedPair();
+    const lProbe = new Client({ name: "leak-probe", version: "0.0.0" });
+    await Promise.all([lProbe.connect(lc), lServer.connect(ls)]);
+    try {
+      const result = await lProbe.callTool({ name: "hashavshevet_companies", arguments: { action: "refresh" } });
+      const text = (result as { content: Array<{ type: string; text: string }> }).content.map((b) => b.text).join("\n");
+      expect((result as { isError?: boolean }).isError).toBe(true);
+      expect(text).toContain("failed at the provider");
+      expect(text).not.toContain(leak);
+      expect(await readFile(lStore.filePath, "utf8")).toBe(before);
+    } finally {
+      await lProbe.close();
+      await lServer.close();
+    }
+  });
+
   it("cached list reports the stored companies with NO validation marker and no API call", async () => {
     const result = await callTool("hashavshevet_companies", { action: "list" });
     const parsed = JSON.parse(resultText(result)) as { companies: Array<{ name: string }>; validation?: string };
