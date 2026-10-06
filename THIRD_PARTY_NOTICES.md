@@ -806,7 +806,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## fast-uri@3.1.5
+## fast-uri@3.1.7
 
 - License: BSD-3-Clause
 - Source: https://github.com/fastify/fast-uri.git
@@ -1668,7 +1668,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-## proxy-addr@2.0.7
+## proxy-addr@2.0.8
 
 - License: MIT
 - Source: jshttp/proxy-addr
