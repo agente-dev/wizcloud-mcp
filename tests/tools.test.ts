@@ -208,6 +208,44 @@ describe("hashavshevet_companies", () => {
     }
   });
 
+  it("LEGACY-COMPAT: tool refresh over {status:'OK',companies:[...]} succeeds with NO marker and one API call", async () => {
+    let tokenCalls = 0;
+    const legacyFetch = (async (input: unknown): Promise<Response> => {
+      const url = String(input);
+      if (url.includes("/createSession/")) {
+        return new Response(JSON.stringify({ wizAuthToken: "legacy-session-xxx" }), { status: 200 });
+      }
+      tokenCalls += 1;
+      return new Response(
+        JSON.stringify({ status: "OK", companies: [{ CompanyName: "Legacy Co", DBName: "legacy-db" }] }),
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch;
+    const legacyClient = new WizcloudClient({
+      server: "lb1.wizcloud.co.il",
+      apiToken: "test-token-xxx",
+      primaryDb: "TESTDB",
+      fetchImpl: legacyFetch,
+    });
+    const lStore = new PortfolioStore(join(dir, "legacy-portfolio.json"), "lb1.wizcloud.co.il");
+    const lServer = new McpServer({ name: "wizcloud-mcp-legacy-test", version: "0.0.0" });
+    registerTools(lServer, { clientFor: () => legacyClient, defaultClient: legacyClient, portfolio: lStore });
+    const [lc, ls] = InMemoryTransport.createLinkedPair();
+    const lProbe = new Client({ name: "legacy-probe", version: "0.0.0" });
+    await Promise.all([lProbe.connect(lc), lServer.connect(ls)]);
+    try {
+      const result = await lProbe.callTool({ name: "hashavshevet_companies", arguments: { action: "refresh" } });
+      const text = (result as { content: Array<{ type: string; text: string }> }).content.map((b) => b.text).join("\n");
+      expect((result as { isError?: boolean }).isError).toBeFalsy();
+      expect(text).toContain("Legacy Co");
+      expect(text).not.toContain("documented-ok");
+      expect(tokenCalls).toBe(1);
+    } finally {
+      await lProbe.close();
+      await lServer.close();
+    }
+  });
+
   it("PRRT_Su: refresh of a padded Company_File_Name requests the CLEAN DB in the real session call", async () => {
     // Real WizcloudClient + real tool wiring; capture the createSession URL.
     const sessionUrls: string[] = [];

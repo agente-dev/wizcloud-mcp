@@ -250,6 +250,84 @@ describe("parseDocumentedTokenCompanies (documented envelope)", () => {
     ).toEqual({ outcome: "malformed" });
   });
 
+  it("LEGACY-COMPAT: {status:'OK', companies:[legacy rows]} stays LEGACY — unrelated status string is not a native claim (Root PRRT_S2)", () => {
+    // Root's regression proof: this exact body must parse through the legacy
+    // normalizer (1 company), NOT be claimed native and malformed.
+    expect(
+      parseDocumentedTokenCompanies(
+        { status: "OK", companies: [{ CompanyName: "Legacy Co", DBName: "legacy-db" }] },
+        "lb1",
+      ),
+    ).toBeNull();
+    expect(
+      normalizeCompanies(
+        { status: "OK", companies: [{ CompanyName: "Legacy Co", DBName: "legacy-db" }] },
+        "lb1",
+      ),
+    ).toEqual([{ name: "Legacy Co", dbName: "legacy-db", server: "lb1" }]);
+  });
+
+  it("LEGACY-COMPAT: all 5 legacy top-level aliases with an unrelated status field stay legacy", () => {
+    const row = { CompanyName: "Legacy Co", DBName: "legacy-db" };
+    const aliases: Array<Record<string, unknown>> = [
+      { status: "OK", companies: [row] },
+      { status: "OK", Companies: [row] },
+      { status: "OK", data: [row] },
+      { status: "OK", rows: [row] },
+      { status: "OK", Items: [row] },
+    ];
+    for (const body of aliases) {
+      expect(parseDocumentedTokenCompanies(body, "lb1")).toBeNull();
+      expect(normalizeCompanies(body, "lb1")).toEqual([
+        { name: "Legacy Co", dbName: "legacy-db", server: "lb1" },
+      ]);
+    }
+  });
+
+  it("LEGACY-COMPAT: status null / array / object-without-native-keys bodies stay legacy", () => {
+    const row = [{ CompanyName: "Legacy Co", DBName: "legacy-db" }];
+    expect(parseDocumentedTokenCompanies({ status: null, companies: row }, "lb1")).toBeNull();
+    expect(parseDocumentedTokenCompanies({ status: ["OK"], companies: row }, "lb1")).toBeNull();
+    expect(
+      parseDocumentedTokenCompanies({ status: { healthy: true }, companies: row }, "lb1"),
+    ).toBeNull();
+    expect(normalizeCompanies({ status: null, companies: row }, "lb1")).toEqual([
+      { name: "Legacy Co", dbName: "legacy-db", server: "lb1" },
+    ]);
+  });
+
+  it("PARTIAL-NATIVE: OWN status object with OWN native errors/repdata claims native even WITHOUT statusCode -> malformed", () => {
+    const row = { Company_File_Name: "native-db", Company_Name: "Native Co" };
+    // errors-only
+    expect(
+      parseDocumentedTokenCompanies({ status: { errors: "OK" }, companies: [row] }, "lb1"),
+    ).toEqual({ outcome: "malformed" });
+    // repdata-only
+    expect(
+      parseDocumentedTokenCompanies({ status: { repdata: [row] }, companies: [row] }, "lb1"),
+    ).toEqual({ outcome: "malformed" });
+    // errors + repdata, still missing statusCode
+    expect(
+      parseDocumentedTokenCompanies({ status: { errors: "OK", repdata: [row] } }, "lb1"),
+    ).toEqual({ outcome: "malformed" });
+  });
+
+  it("PARTIAL-NATIVE: inherited-only native keys are still NOT authority", () => {
+    const statusObj = Object.create({ errors: "OK", repdata: [] });
+    expect(parseDocumentedTokenCompanies({ status: statusObj }, "lb1")).toBeNull();
+  });
+
+  it("OWN statusCode always dominates: valid legacy rows under an OWN statusCode never fall back", () => {
+    const row = [{ CompanyName: "Legacy Co", DBName: "legacy-db" }];
+    // statusCode present + unrelated status -> native claim, malformed/rejected — never legacy.
+    expect(
+      parseDocumentedTokenCompanies({ statusCode: 200, status: "OK", companies: row }, "lb1"),
+    ).toEqual({ outcome: "malformed" });
+    expect(
+      parseDocumentedTokenCompanies({ statusCode: 500, companies: row }, "lb1"),
+    ).toEqual({ outcome: "rejected", reason: "provider-error" });
+  });
+
   it("REQUIRES an OWN statusCode even when status alone is present (Root counterexample A)", () => {
     // {status:{errors:"OK",repdata:[]}} WITHOUT statusCode must NOT validate
     // as documented success — the documented envelope always carries
@@ -491,6 +569,41 @@ describe("PortfolioStore.refresh against the documented envelope", () => {
   it("keeps the historical shape failure for an ambiguous legacy empty body", async () => {
     const client = documentedClient([]);
     await expect(store.refresh(client)).rejects.toThrow(/no companies/);
+  });
+
+  it("REAL-CLIENT legacy-compat: unrelated status + legacy companies refresh WITHOUT a documented marker", async () => {
+    const client = documentedClient({
+      status: "OK",
+      companies: [{ CompanyName: "Legacy Co", DBName: "legacy-db" }],
+    });
+    const result = await store.refresh(client);
+    expect(result.companies).toEqual([
+      { name: "Legacy Co", dbName: "legacy-db", server: "lb1.wizcloud.co.il" },
+    ]);
+    expect("validation" in result).toBe(false);
+  });
+
+  it("REAL-CLIENT legacy-compat: TRUE legacy empty keeps the failure with cache bytes unchanged", async () => {
+    await store.save(PORTFOLIO);
+    const before = await readFile(store.filePath, "utf8");
+    const client = documentedClient({ status: "OK", companies: [] });
+    await expect(store.refresh(client)).rejects.toThrow(/no companies/);
+    expect(await readFile(store.filePath, "utf8")).toBe(before);
+  });
+
+  it("REAL-CLIENT partial-native: status{errors,repdata} without statusCode -> fixed malformed, cache bytes+0600 unchanged", async () => {
+    await store.save(PORTFOLIO);
+    const before = await readFile(store.filePath, "utf8");
+    const modeBefore = (await stat(store.filePath)).mode & 0o777;
+    const client = documentedClient({
+      status: { errors: "OK", repdata: [{ Company_File_Name: "native-db" }] },
+    });
+    await expect(store.refresh(client)).rejects.toThrow(
+      /claimed the documented envelope but was malformed/,
+    );
+    expect(await readFile(store.filePath, "utf8")).toBe(before);
+    expect((await stat(store.filePath)).mode & 0o777).toBe(modeBefore);
+    expect(modeBefore).toBe(0o600);
   });
 
   it("a missing statusCode through the REAL client is a fixed malformed error with cache bytes and mode unchanged", async () => {

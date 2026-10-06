@@ -201,8 +201,9 @@ export type PortfolioRefreshResult = Portfolio & { validation?: "documented-ok" 
  * - `ok` — exact documented success; `repdata` may legitimately be EMPTY.
  * - `rejected` — explicit provider non-success (non-"OK" own `errors`, or a
  *   statusCode other than 200). HTTP 200 alone is NOT success.
- * - `malformed` — the body CLAIMS the documented envelope (own `statusCode`
- *   or own `status`) but violates it. Never falls back to legacy parsing.
+ * - `malformed` — the body CLAIMS the documented envelope (an OWN
+ *   `statusCode`, or an OWN `status` OBJECT carrying OWN native keys
+ *   `errors`/`repdata`) but violates it. Never falls back to legacy parsing.
  */
 export type DocumentedTokenCompanies =
   | { outcome: "ok"; companies: Company[] }
@@ -212,8 +213,11 @@ export type DocumentedTokenCompanies =
 /**
  * Validate the DOCUMENTED TokenCompanies envelope strictly.
  * Claims are detected on the response's OWN properties only (inherited
- * metadata is not a claim). Returns null ONLY for bodies making no
- * documented claim at all — the legacy alias normalizer then applies.
+ * metadata is not a claim; an OWN `statusCode` always claims, and an OWN
+ * `status` claims only when it is a non-array object with OWN native
+ * `errors`/`repdata` keys — unrelated scalar/null/array `status` values are
+ * legacy-eligible). Returns null ONLY for bodies making no documented claim
+ * at all — the legacy alias normalizer then applies.
  */
 export function parseDocumentedTokenCompanies(
   raw: unknown,
@@ -221,13 +225,26 @@ export function parseDocumentedTokenCompanies(
 ): DocumentedTokenCompanies | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const record = raw as Record<string, unknown>;
-  const claimsStatus = Object.hasOwn(record, "statusCode");
-  const claimsState = Object.hasOwn(record, "status");
-  if (!claimsStatus && !claimsState) return null;
+  const claimsStatusCode = Object.hasOwn(record, "statusCode");
+  // An OWN `status` only claims the native envelope when it is a non-array
+  // OBJECT carrying OWN native keys (`errors` or `repdata`) — inherited-only
+  // native keys are not authority. An unrelated scalar/null/array `status`
+  // (legacy APIs commonly carry one beside their rows) stays legacy-eligible.
+  let claimsNativeStatus = false;
+  if (Object.hasOwn(record, "status")) {
+    const status = record.status;
+    if (status !== null && typeof status === "object" && !Array.isArray(status)) {
+      const statusRecord = status as Record<string, unknown>;
+      claimsNativeStatus =
+        Object.hasOwn(statusRecord, "errors") || Object.hasOwn(statusRecord, "repdata");
+    }
+  }
+  if (!claimsStatusCode && !claimsNativeStatus) return null;
 
-  // statusCode: REQUIRED OWN property for every documented claim — a status
-  // object alone is claimed-but-broken, never a successful validation.
-  if (!claimsStatus) return { outcome: "malformed" };
+  // statusCode: REQUIRED OWN property for every documented claim — OWN
+  // statusCode always dominates (strict, never legacy fallback), and a
+  // native-keyed status object without it is claimed-but-broken.
+  if (!claimsStatusCode) return { outcome: "malformed" };
   const code = record.statusCode;
   if (typeof code !== "number" || !Number.isInteger(code) || !Number.isFinite(code)) {
     return { outcome: "malformed" };
@@ -235,11 +252,8 @@ export function parseDocumentedTokenCompanies(
   if (code !== 200) return { outcome: "rejected", reason: "provider-error" };
 
   // status: OWN object with OWN string `errors` literal "OK".
-  if (!claimsState) return { outcome: "malformed" };
+  if (!claimsNativeStatus) return { outcome: "malformed" };
   const status = record.status;
-  if (status === null || typeof status !== "object" || Array.isArray(status)) {
-    return { outcome: "malformed" };
-  }
   const statusRecord = status as Record<string, unknown>;
   if (!Object.hasOwn(statusRecord, "errors")) return { outcome: "malformed" };
   const errors = statusRecord.errors;
