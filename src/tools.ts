@@ -80,13 +80,24 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     async ({ action }) => {
       try {
         if (action === "refresh") {
-          const portfolio = await deps.portfolio.refresh(deps.defaultClient);
+          const result = await deps.portfolio.refresh(deps.defaultClient);
+          // Forward the derived marker ONLY when PortfolioStore actually
+          // validated the fresh response as documented success; legacy
+          // refreshes return the plain shape with no marker.
+          if (result.validation === "documented-ok") {
+            return ok({
+              companies: result.companies,
+              updatedAt: result.updatedAt,
+              validation: "documented-ok",
+            });
+          }
           return ok({
-            companies: portfolio.companies,
-            updatedAt: portfolio.updatedAt,
+            companies: result.companies,
+            updatedAt: result.updatedAt,
           });
         }
         const portfolio = await deps.portfolio.loadOrRefresh(deps.defaultClient);
+        // Cached/list reads cannot attest a fresh envelope — no marker here.
         return ok({
           companies: portfolio.companies,
           updatedAt: portfolio.updatedAt,
